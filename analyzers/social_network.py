@@ -11,6 +11,10 @@ from collections import defaultdict, Counter
 from typing import Dict, List, Any, Tuple, Set
 from datetime import datetime, timedelta
 from .base import BaseAnalyzer
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.message_parser import message_parser
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,7 +26,7 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
     def __init__(self, time_window_minutes: int = 30, min_interaction_strength: float = 0.1):
         """
         初始化社交网络分析器
-        
+
         Args:
             time_window_minutes: 互动时间窗口（分钟）
             min_interaction_strength: 最小互动强度阈值
@@ -36,6 +40,7 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
         self.min_interaction_strength = min_interaction_strength
         self.graph = nx.DiGraph()  # 有向图，表示互动方向
         self.undirected_graph = None  # 无向图，用于某些算法
+        self.content_parser = message_parser  # 使用消息内容解析器
     
     def _get_user_name(self, user_id: str) -> str:
         """获取用户名称"""
@@ -109,20 +114,36 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
         
         return False
     
-    def _is_mention_interaction(self, content1: str, content2: str, sender1: str, sender2: str) -> bool:
-        """判断是否为提及互动"""
+    def _is_mention_interaction(self, content1: str, content2: str, sender1: str, sender2: str) -> Tuple[bool, List[str]]:
+        """
+        判断是否为提及互动，并返回被提及的用户
+
+        Returns:
+            Tuple[bool, List[str]]: (是否有提及, 被提及的用户列表)
+        """
+        mentioned_users = []
+
+        # 使用消息解析器提取@艾特信息
+        parsed1 = self.content_parser.parse_message(content1)
+        parsed2 = self.content_parser.parse_message(content2)
+
+        # 收集所有被@的用户
+        all_mentions = parsed1['mentions'] + parsed2['mentions']
+
         # 检查是否直接提及用户名
         sender1_name = self._get_user_name(sender1)
         sender2_name = self._get_user_name(sender2)
-        
+
         if sender1_name in content2 or sender2_name in content1:
-            return True
-        
-        # 检查@符号
-        if '@' in content1 or '@' in content2:
-            return True
-        
-        return False
+            mentioned_users.extend([sender1_name, sender2_name])
+
+        # 添加@艾特的用户
+        mentioned_users.extend(all_mentions)
+
+        # 去重
+        mentioned_users = list(set(mentioned_users))
+
+        return len(mentioned_users) > 0, mentioned_users
     
     def _calculate_content_similarity(self, content1: str, content2: str) -> float:
         """计算内容相似度"""
@@ -213,7 +234,8 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
             'total_time_gap': 0,
             'reply_count': 0,
             'mention_count': 0,
-            'content_similarity': 0
+            'content_similarity': 0,
+            'mentioned_users': set()  # 记录被@的用户
         }))
         
         for i in range(len(data)):
@@ -254,7 +276,7 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
                 is_reply = self._is_reply_interaction(current_content, next_content)
                 
                 # 检查是否有提及
-                is_mention = self._is_mention_interaction(current_content, next_content, current_sender, next_sender)
+                is_mention, mentioned_users = self._is_mention_interaction(current_content, next_content, current_sender, next_sender)
                 
                 # 计算内容相似度
                 similarity = self._calculate_content_similarity(current_content, next_content)
@@ -267,6 +289,8 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
                     interaction['reply_count'] += 1
                 if is_mention:
                     interaction['mention_count'] += 1
+                    # 记录被@的用户
+                    interaction['mentioned_users'].update(mentioned_users)
                 interaction['content_similarity'] += similarity
         
         # 添加边到图中
@@ -279,14 +303,15 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
                     if strength >= self.min_interaction_strength:
                         avg_time_gap = stats['total_time_gap'] / stats['count']
                         avg_similarity = stats['content_similarity'] / stats['count']
-                        
+
                         self.graph.add_edge(sender, receiver,
                                           weight=strength,
                                           interaction_count=stats['count'],
                                           reply_count=stats['reply_count'],
                                           mention_count=stats['mention_count'],
                                           avg_time_gap=avg_time_gap,
-                                          avg_similarity=avg_similarity)
+                                          avg_similarity=avg_similarity,
+                                          mentioned_users=list(stats['mentioned_users']))  # 转换为列表
 
     def analyze(self, data: List[Dict]) -> Dict[str, Any]:
         """执行高级社交网络分析"""
@@ -319,6 +344,9 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
         # 生成可视化数据
         visualization_data = self._generate_visualization_data()
 
+        # 分析@艾特网络
+        mention_network_analysis = self._analyze_mention_network()
+
         results = {
             'total_messages': len(data),
             'total_users': self.graph.number_of_nodes(),
@@ -329,7 +357,8 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
             'interaction_analysis': interaction_analysis,
             'key_players': key_players,
             'network_structure': network_structure,
-            'visualization_data': visualization_data
+            'visualization_data': visualization_data,
+            'mention_network': mention_network_analysis  # 新增@艾特网络分析
         }
 
         logger.info(f"社交网络分析完成，共分析 {len(data)} 条消息，{self.graph.number_of_nodes()} 个用户，{self.graph.number_of_edges()} 个互动关系")
@@ -622,7 +651,11 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
                     'target': v,
                     'weight': data.get('weight', 0),
                     'interaction_count': data.get('interaction_count', 0),
-                    'width': data.get('weight', 0.1) * 10  # 边宽度基于权重
+                    'reply_count': data.get('reply_count', 0),
+                    'mention_count': data.get('mention_count', 0),
+                    'mentioned_users': data.get('mentioned_users', []),  # 新增@艾特用户信息
+                    'width': data.get('weight', 0.1) * 10,  # 边宽度基于权重
+                    'has_mentions': data.get('mention_count', 0) > 0  # 是否包含@艾特
                 })
 
             # 社区信息（如果有）
@@ -630,10 +663,14 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
             if hasattr(self, '_communities') and self._communities:
                 communities_data = self._communities
 
+            # 生成@艾特网络可视化数据
+            mention_viz_data = self._generate_mention_visualization_data()
+
             return {
                 'nodes': nodes,
                 'edges': edges,
                 'communities': communities_data,
+                'mention_network': mention_viz_data,  # 新增@艾特网络可视化数据
                 'layout_suggestions': {
                     'spring': 'spring_layout',
                     'circular': 'circular_layout',
@@ -654,6 +691,7 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
         communities = results.get('communities', {})
         key_players = results.get('key_players', {})
         network_structure = results.get('network_structure', {})
+        mention_network = results.get('mention_network', {})
 
         summary = {
             '总消息数': results.get('total_messages', 0),
@@ -670,4 +708,197 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
             '是否连通': '是' if network_structure.get('is_connected', False) else '否'
         }
 
+        # 添加@艾特网络信息
+        if mention_network.get('has_mentions', False):
+            top_mentioned = mention_network.get('top_mentioned_users', [])
+            mention_patterns = mention_network.get('mention_patterns', {})
+
+            summary.update({
+                '总@艾特数': mention_network.get('total_mentions', 0),
+                '被@用户数': mention_network.get('unique_mentioned_users', 0),
+                '最常被@用户': top_mentioned[0][0] if top_mentioned else '无',
+                '@艾特互惠率': f"{mention_patterns.get('mention_reciprocity_rate', 0):.1%}",
+                '@艾特关系数': mention_patterns.get('total_mention_relationships', 0)
+            })
+
         return summary
+
+    def _analyze_mention_network(self) -> Dict[str, Any]:
+        """
+        分析@艾特网络
+
+        Returns:
+            @艾特网络分析结果
+        """
+        if self.graph.number_of_edges() == 0:
+            return {'has_mentions': False, 'total_mentions': 0}
+
+        try:
+            # 收集所有@艾特信息
+            all_mentioned_users = []
+            mention_edges = []
+
+            for u, v, data in self.graph.edges(data=True):
+                mentioned_users = data.get('mentioned_users', [])
+                mention_count = data.get('mention_count', 0)
+
+                if mentioned_users:
+                    all_mentioned_users.extend(mentioned_users)
+                    mention_edges.append({
+                        'from': self._get_user_name(u),
+                        'to': self._get_user_name(v),
+                        'mentioned_users': mentioned_users,
+                        'mention_count': mention_count
+                    })
+
+            if not all_mentioned_users:
+                return {'has_mentions': False, 'total_mentions': 0}
+
+            # 统计@艾特频率
+            from collections import Counter
+            mention_counter = Counter(all_mentioned_users)
+
+            # 最常被@的用户
+            top_mentioned = mention_counter.most_common(10)
+
+            # 分析@艾特模式
+            mention_patterns = self._analyze_mention_patterns(mention_edges)
+
+            # 构建纯@艾特网络图
+            mention_graph = self._build_mention_graph(mention_edges)
+
+            return {
+                'has_mentions': True,
+                'total_mentions': len(all_mentioned_users),
+                'unique_mentioned_users': len(mention_counter),
+                'top_mentioned_users': top_mentioned,
+                'mention_edges': mention_edges,
+                'mention_patterns': mention_patterns,
+                'mention_graph_stats': {
+                    'nodes': mention_graph.number_of_nodes(),
+                    'edges': mention_graph.number_of_edges(),
+                    'density': nx.density(mention_graph) if mention_graph.number_of_nodes() > 1 else 0
+                }
+            }
+        except Exception as e:
+            logger.error(f"@艾特网络分析失败: {e}")
+            return {'has_mentions': False, 'total_mentions': 0, 'error': str(e)}
+
+    def _analyze_mention_patterns(self, mention_edges: List[Dict]) -> Dict[str, Any]:
+        """分析@艾特模式"""
+        if not mention_edges:
+            return {}
+
+        # 分析谁最喜欢@别人
+        mentioner_stats = defaultdict(int)
+        for edge in mention_edges:
+            if edge['mention_count'] > 0:
+                mentioner_stats[edge['from']] += edge['mention_count']
+
+        # 分析@艾特的互惠性
+        mutual_mentions = 0
+        total_mention_pairs = 0
+
+        for edge in mention_edges:
+            if edge['mention_count'] > 0:
+                total_mention_pairs += 1
+                # 检查是否有反向@艾特
+                reverse_edge = next((e for e in mention_edges
+                                   if e['from'] == edge['to'] and e['to'] == edge['from']
+                                   and e['mention_count'] > 0), None)
+                if reverse_edge:
+                    mutual_mentions += 1
+
+        reciprocity_rate = mutual_mentions / total_mention_pairs if total_mention_pairs > 0 else 0
+
+        return {
+            'top_mentioners': sorted(mentioner_stats.items(), key=lambda x: x[1], reverse=True)[:5],
+            'mention_reciprocity_rate': reciprocity_rate,
+            'total_mention_relationships': total_mention_pairs,
+            'mutual_mention_relationships': mutual_mentions
+        }
+
+    def _build_mention_graph(self, mention_edges: List[Dict]) -> nx.DiGraph:
+        """构建纯@艾特网络图"""
+        mention_graph = nx.DiGraph()
+
+        for edge in mention_edges:
+            if edge['mention_count'] > 0:
+                mention_graph.add_edge(
+                    edge['from'],
+                    edge['to'],
+                    weight=edge['mention_count'],
+                    mentioned_users=edge['mentioned_users']
+                )
+
+        return mention_graph
+
+    def _generate_mention_visualization_data(self) -> Dict[str, Any]:
+        """
+        生成@艾特网络专门的可视化数据
+
+        Returns:
+            @艾特网络可视化数据
+        """
+        try:
+            # 收集@艾特边
+            mention_edges = []
+            mention_nodes = set()
+
+            for u, v, data in self.graph.edges(data=True):
+                mention_count = data.get('mention_count', 0)
+                mentioned_users = data.get('mentioned_users', [])
+
+                if mention_count > 0:
+                    mention_edges.append({
+                        'source': u,
+                        'target': v,
+                        'mention_count': mention_count,
+                        'mentioned_users': mentioned_users,
+                        'width': min(mention_count * 2, 10),  # 边宽度基于@艾特次数
+                        'color': '#ff6b6b'  # @艾特边用红色
+                    })
+                    mention_nodes.add(u)
+                    mention_nodes.add(v)
+
+            # 生成@艾特节点数据
+            mention_node_data = []
+            for node in mention_nodes:
+                # 计算该用户被@的次数和@别人的次数
+                mentioned_count = 0
+                mentioning_count = 0
+
+                for edge in mention_edges:
+                    if edge['target'] == node:
+                        mentioning_count += edge['mention_count']
+                    if edge['source'] == node:
+                        mentioned_count += edge['mention_count']
+
+                mention_node_data.append({
+                    'id': node,
+                    'name': self._get_user_name(node),
+                    'mentioned_count': mentioned_count,  # 被@次数
+                    'mentioning_count': mentioning_count,  # @别人次数
+                    'size': max(mentioned_count + mentioning_count, 5),  # 节点大小基于@艾特活跃度
+                    'color': '#ff9999' if mentioned_count > mentioning_count else '#99ccff'  # 被@多的用红色，@别人多的用蓝色
+                })
+
+            # 统计@艾特热力图数据（用户间@艾特强度矩阵）
+            mention_matrix = {}
+            for edge in mention_edges:
+                source_name = self._get_user_name(edge['source'])
+                target_name = self._get_user_name(edge['target'])
+                mention_matrix[f"{source_name}->{target_name}"] = edge['mention_count']
+
+            return {
+                'nodes': mention_node_data,
+                'edges': mention_edges,
+                'mention_matrix': mention_matrix,
+                'has_data': len(mention_edges) > 0,
+                'total_mention_edges': len(mention_edges),
+                'total_mention_nodes': len(mention_node_data)
+            }
+
+        except Exception as e:
+            logger.error(f"生成@艾特可视化数据失败: {e}")
+            return {'has_data': False, 'nodes': [], 'edges': [], 'mention_matrix': {}}
