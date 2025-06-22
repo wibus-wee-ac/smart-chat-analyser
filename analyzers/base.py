@@ -27,13 +27,14 @@ class BaseAnalyzer(ABC):
         self.is_analyzed = False
     
     @abstractmethod
-    def analyze(self, data: List[Dict]) -> Dict[str, Any]:
+    def analyze(self, data: List[Dict], task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         执行分析
-        
+
         Args:
             data: 聊天记录数据列表
-            
+            task_id: 可选的任务ID，用于进度更新
+
         Returns:
             分析结果字典
         """
@@ -51,22 +52,18 @@ class BaseAnalyzer(ABC):
     
     def preprocess_data(self, data: List[Dict]) -> List[Dict]:
         """
-        数据预处理
-        
+        数据预处理（数据已在服务层预处理，此处直接返回）
+
         Args:
-            data: 原始数据
-            
+            data: 已预处理的数据
+
         Returns:
-            预处理后的数据
+            数据（无需额外处理）
         """
-        # 过滤掉空内容的消息
-        filtered_data = []
-        for item in data:
-            if isinstance(item, dict) and item.get('content'):
-                filtered_data.append(item)
-        
-        logger.info(f"数据预处理完成，原始数据 {len(data)} 条，过滤后 {len(filtered_data)} 条")
-        return filtered_data
+        # 数据已经在 DataPreprocessingService 中完成预处理
+        # 这里直接返回，避免重复处理
+        logger.debug(f"接收到预处理后的数据: {len(data)} 条")
+        return data
     
     def validate_data(self, data: List[Dict]) -> bool:
         """
@@ -100,29 +97,27 @@ class BaseAnalyzer(ABC):
         
         return True
     
-    def run(self, data: List[Dict]) -> Dict[str, Any]:
+    def run(self, data: List[Dict], task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         运行分析流程
-        
+
         Args:
-            data: 聊天记录数据
-            
+            data: 已预处理的聊天记录数据
+            task_id: 可选的任务ID，用于进度更新
+
         Returns:
             分析结果
         """
         logger.info(f"开始运行分析器: {self.name}")
-        
+
         # 数据验证
         if not self.validate_data(data):
             raise ValueError("数据格式无效")
-        
-        # 数据预处理
-        processed_data = self.preprocess_data(data)
-        
-        # 执行分析
-        self.results = self.analyze(processed_data)
+
+        # 直接执行分析（数据已在服务层预处理）
+        self.results = self.analyze(data, task_id)
         self.is_analyzed = True
-        
+
         logger.info(f"分析器 {self.name} 运行完成")
         return self.results
     
