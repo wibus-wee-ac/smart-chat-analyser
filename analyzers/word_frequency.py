@@ -8,7 +8,7 @@ import jieba
 import re
 import os
 from collections import Counter
-from typing import Dict, List, Any, Tuple, Set
+from typing import Dict, List, Any, Tuple, Optional, Set
 from .base import BaseAnalyzer
 import sys
 import os
@@ -101,7 +101,7 @@ class WordFrequencyAnalyzer(BaseAnalyzer):
         logger.info(f"总共加载停用词: {len(stop_words)} 个")
         return stop_words
 
-    def analyze(self, data: List[Dict]) -> Dict[str, Any]:
+    def analyze(self, data: List[Dict], task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         执行高频词汇分析
 
@@ -149,9 +149,13 @@ class WordFrequencyAnalyzer(BaseAnalyzer):
         # 按词性分类统计
         word_by_type = self._categorize_words(words)
 
-        # 短语分析（2-3个词的组合）
-        phrases = self._extract_phrases(words)
-        phrase_counts = Counter(phrases)
+        # 短语分析：优先识别重复的完整句子，然后提取常规短语
+        repeated_sentences = self._extract_repeated_sentences(all_text)
+        regular_phrases = self._extract_phrases(words)
+
+        # 合并重复句子和常规短语
+        all_phrases = repeated_sentences + regular_phrases
+        phrase_counts = Counter(all_phrases)
         top_phrases = phrase_counts.most_common(min(20, len(phrase_counts)))
 
         # 统计@艾特信息
@@ -339,14 +343,48 @@ class WordFrequencyAnalyzer(BaseAnalyzer):
         
         return categories
     
+    def _extract_repeated_sentences(self, text: str, min_repeat: int = 3, min_length: int = 10) -> List[str]:
+        """
+        提取重复出现的完整句子
+
+        Args:
+            text: 原始文本
+            min_repeat: 最小重复次数
+            min_length: 句子最小长度
+
+        Returns:
+            重复句子列表
+        """
+        repeated_sentences = []
+
+        # 按句号、感叹号、问号等分割句子
+        sentences = re.split(r'[。！？\n]+', text)
+        sentence_counts = Counter()
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) >= min_length:
+                # 移除多余空格
+                clean_sentence = re.sub(r'\s+', '', sentence)
+                if clean_sentence:
+                    sentence_counts[clean_sentence] += 1
+
+        # 找出重复次数达到阈值的句子
+        for sentence, count in sentence_counts.items():
+            if count >= min_repeat:
+                # 为每次重复添加到结果中
+                repeated_sentences.extend([sentence] * count)
+
+        return repeated_sentences
+
     def _extract_phrases(self, words: List[str], max_length: int = 3) -> List[str]:
         """
         提取短语
-        
+
         Args:
             words: 词汇列表
             max_length: 短语最大长度
-            
+
         Returns:
             短语列表
         """
@@ -357,7 +395,7 @@ class WordFrequencyAnalyzer(BaseAnalyzer):
                     phrase = ''.join(words[i:i+length])
                     if len(phrase) >= 4:  # 短语至少4个字符
                         phrases.append(phrase)
-        
+
         return phrases
     
     def get_summary(self) -> Dict[str, Any]:

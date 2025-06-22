@@ -34,7 +34,7 @@ class TimePatternAnalyzer(BaseAnalyzer):
             description="分析聊天记录的时间分布和活跃模式"
         )
     
-    def analyze(self, data: List[Dict]) -> Dict[str, Any]:
+    def analyze(self, data: List[Dict], task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         执行时间模式分析
 

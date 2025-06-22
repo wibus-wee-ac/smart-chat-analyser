@@ -131,13 +131,20 @@ class SentimentAnalyzer(BaseAnalyzer):
 
         return {'sentiment': 'neutral', 'confidence': 0.0, 'method': 'transformers_failed'}
 
-
+    def _update_task_progress(self, task_id: str, progress: float, message: str):
+        """更新任务进度"""
+        try:
+            from core.task_queue import get_task_queue
+            task_queue = get_task_queue()
+            task_queue.update_task_progress(task_id, progress, message)
+        except Exception as e:
+            logger.warning(f"更新进度失败: {e}")
 
     def analyze_single_text(self, text: str) -> Dict[str, Any]:
         """分析单条文本的情感"""
         return self._analyze_with_transformers(text)
 
-    def analyze(self, data: List[Dict]) -> Dict[str, Any]:
+    def analyze(self, data: List[Dict], task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         执行增强版情感分析
 
@@ -165,10 +172,11 @@ class SentimentAnalyzer(BaseAnalyzer):
             if self.show_progress:
                 logger.info(f"开始分析 {len(data)} 条消息...")
 
-        # 用于日志进度显示
+        # 用于进度显示和 WebSocket 更新
         total_count = len(data)
         processed_count = 0
         last_logged_percent = -1
+        last_websocket_percent = -1
 
         for item in data_iter:
             content = item.get('content', '')
@@ -214,11 +222,18 @@ class SentimentAnalyzer(BaseAnalyzer):
             else:
                 neutral_messages.append(message_data)
 
-            # 更新进度（当没有 tqdm 时使用日志显示）
-            if self.show_progress and not TQDM_AVAILABLE:
+            # 更新进度（统一处理 tqdm 和非 tqdm 情况的 WebSocket 更新）
+            if self.show_progress:
                 processed_count += 1
                 current_percent = int((processed_count / total_count) * 100)
-                if current_percent > last_logged_percent and current_percent % 10 == 0:
+
+                # WebSocket 进度更新（每5%更新一次，减少频率）
+                if task_id and current_percent > last_websocket_percent and current_percent % 5 == 0:
+                    self._update_task_progress(task_id, current_percent, f"情感分析进度: {processed_count}/{total_count}")
+                    last_websocket_percent = current_percent
+
+                # 日志进度显示（仅在没有 tqdm 时）
+                if not TQDM_AVAILABLE and current_percent > last_logged_percent and current_percent % 10 == 0:
                     logger.info(f"分析进度: {current_percent}% ({processed_count}/{total_count})")
                     last_logged_percent = current_percent
 

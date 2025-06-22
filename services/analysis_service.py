@@ -203,7 +203,7 @@ class AnalysisService:
             start_time = datetime.now()
             
             # 执行分析
-            result = analyzer.run(data)
+            result = analyzer.run(data, task_id)
             
             # 记录结束时间
             end_time = datetime.now()

@@ -47,12 +47,12 @@ class Config:
     # 性能配置
     MAX_CONTENT_LENGTH: int = int(os.getenv('MAX_CONTENT_LENGTH', '16777216'))  # 16MB
     
-    def __post_init__(self):
-        """配置后处理"""
-        # 确保目录存在
-        os.makedirs(self.MODEL_CACHE_DIR, exist_ok=True)
-        os.makedirs(self.CHARTS_OUTPUT_DIR, exist_ok=True)
-        os.makedirs(self.LOGS_DIR, exist_ok=True)
+    # def __post_init__(self):
+    #     """配置后处理"""
+    #     # 确保目录存在
+    #     os.makedirs(self.MODEL_CACHE_DIR, exist_ok=True)
+    #     os.makedirs(self.CHARTS_OUTPUT_DIR, exist_ok=True)
+    #     os.makedirs(self.LOGS_DIR, exist_ok=True)
 
 # 全局配置实例
 config = Config()

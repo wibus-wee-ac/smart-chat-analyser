@@ -8,7 +8,7 @@ import networkx as nx
 import community as community_louvain
 import re
 from collections import defaultdict, Counter
-from typing import Dict, List, Any, Tuple, Set
+from typing import Dict, List, Any, Tuple, Set, Optional
 from datetime import datetime, timedelta
 from .base import BaseAnalyzer
 import sys
@@ -324,7 +324,7 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
                                           avg_similarity=avg_similarity,
                                           mentioned_users=list(stats['mentioned_users']))  # 转换为列表
 
-    def analyze(self, data: List[Dict]) -> Dict[str, Any]:
+    def analyze(self, data: List[Dict], task_id: Optional[str] = None) -> Dict[str, Any]:
         """执行高级社交网络分析"""
         logger.info("开始高级社交网络分析")
 
