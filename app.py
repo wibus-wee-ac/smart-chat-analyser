@@ -125,10 +125,10 @@ def start_preloading(preload_manager):
 
 def register_routes(app, socketio, services):
     """注册路由"""
-    # 注册API路由
-    from api.routes import create_api_routes
-    api_blueprint = create_api_routes(services)
-    app.register_blueprint(api_blueprint)
+    # 注册Flask-RESTX API路由
+    from api.routes_restx import create_api_routes
+    api = create_api_routes(services)
+    api.init_app(app)
 
     # 设置WebSocket管理器
     from core.websocket_manager import get_websocket_manager

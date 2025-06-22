@@ -198,27 +198,83 @@ chatlog-analyser/
 
 ## API接口
 
-### 任务管理
+### 📚 自动生成的API文档
+
+本项目已集成 **Flask-RESTX**，提供完整的 OpenAPI 文档和交互式测试界面：
+
+- **Swagger UI**: http://localhost:5031/docs/ - 交互式API文档界面
+- **OpenAPI JSON**: http://localhost:5031/api/v1/swagger.json - OpenAPI规范文档
+
+### 主要特性
+- ✅ **自动文档生成**: 无需手动维护API文档
+- ✅ **交互式测试**: 直接在浏览器中测试API接口
+- ✅ **数据模型验证**: 自动验证请求和响应数据
+- ✅ **标准化错误处理**: 统一的错误响应格式
+- ✅ **命名空间组织**: 按功能模块组织API接口
+
+### API 命名空间
+
+#### 健康检查 (`/health`)
+- `GET /api/v1/health` - 健康检查
+
+#### 任务管理 (`/tasks`)
 - `POST /api/v1/tasks` - 提交分析任务
+- `GET /api/v1/tasks` - 获取任务列表（支持分页和过滤）
 - `GET /api/v1/tasks/{task_id}` - 获取任务状态
 - `GET /api/v1/tasks/{task_id}/result` - 获取任务结果
 - `POST /api/v1/tasks/{task_id}/cancel` - 取消任务
 
-### 系统状态
-- `GET /api/v1/health` - 健康检查
+#### 系统状态 (`/system`, `/queue`)
 - `GET /api/v1/system/stats` - 系统统计信息
 - `GET /api/v1/queue/stats` - 队列统计信息
 
-### 分析器管理
+#### 分析器管理 (`/analyzers`)
 - `GET /api/v1/analyzers` - 获取可用分析器
 - `GET /api/v1/analyzers/{name}` - 获取分析器信息
 
-### 模型管理
+#### 模型管理 (`/models`)
 - `GET /api/v1/models/info` - 获取模型信息
 - `POST /api/v1/models/clear` - 清除模型缓存
 - `POST /api/v1/models/preload` - 预加载模型
 - `GET /api/v1/models/preload/status` - 获取预加载状态
 - `POST /api/v1/models/preload/cancel` - 取消预加载任务
+
+#### 用户缓存管理 (`/user-cache`)
+- `GET /api/v1/user-cache/status` - 获取用户缓存状态
+- `POST /api/v1/user-cache/reload` - 重新加载用户缓存
+- `GET /api/v1/user-cache/search` - 搜索用户
+- `POST /api/v1/user-cache/validate-mention` - 验证@艾特
+
+#### 预加载管理 (`/preload`)
+- `GET /api/v1/preload/status` - 获取所有预加载状态
+- `POST /api/v1/preload/reload-all` - 重新加载所有预加载资源
+
+#### 聊天记录代理 (`/chatlog`)
+- `GET/POST/PUT/DELETE/PATCH /api/v1/chatlog/{path}` - 代理聊天记录请求
+
+### 使用示例
+
+```python
+# 使用提供的客户端
+from examples.api_client_example import ChatlogAnalyzerClient
+
+client = ChatlogAnalyzerClient("http://localhost:5031")
+
+# 健康检查
+health = client.health_check()
+print(f"服务状态: {health['status']}")
+
+# 提交任务
+task_response = client.submit_task("chatlog_analysis", {
+    "talker": "用户名",
+    "limit": 1000
+})
+task_id = task_response['task_id']
+
+# 等待任务完成
+result = client.wait_for_task_completion(task_id)
+print("分析完成！")
+```
 
 ## 模型预加载功能
 
@@ -274,6 +330,7 @@ curl -X POST http://localhost:6142/api/v1/models/preload/cancel \
 - [x] 模型管理和缓存
 - [x] 模型预加载功能
 - [x] 话题聚类模块（BERTopic集成）
+- [x] **Flask-RESTX集成** - 自动生成OpenAPI文档和Swagger UI
 
 ### 📋 计划中
 - [ ] 多语言支持
