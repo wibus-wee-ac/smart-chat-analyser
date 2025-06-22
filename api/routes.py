@@ -19,6 +19,7 @@ def create_api_routes(services):
     analysis_service = services['analysis_service']
     preprocessing_service = services['preprocessing_service']
     visualization_service = services['visualization_service']
+    preload_manager = services['preload_manager']
 
     # 代理路由 - 将 /chatlog/* 转发到 http://127.0.0.1:5030/*
     @api.route('/chatlog/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
@@ -423,7 +424,157 @@ def create_api_routes(services):
         except Exception as e:
             logger.error(f"取消预加载失败: {e}")
             return jsonify({"error": str(e)}), 500
-    
+
+    # 用户缓存管理API
+    @api.route('/user-cache/status', methods=['GET'])
+    def get_user_cache_status():
+        """获取用户缓存状态"""
+        try:
+            status = preload_manager.get_user_cache_stats()
+            preload_status = preload_manager.get_preload_status()
+
+            return jsonify({
+                "cache_status": status,
+                "preload_status": preload_status.get('user_cache', {}),
+                "timestamp": datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"获取用户缓存状态失败: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route('/user-cache/reload', methods=['POST'])
+    def reload_user_cache():
+        """重新加载用户缓存"""
+        try:
+            result = preload_manager.reload_user_cache()
+
+            if result['success']:
+                return jsonify({
+                    "message": "用户缓存重新加载成功",
+                    "result": result,
+                    "timestamp": datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    "error": "用户缓存重新加载失败",
+                    "details": result.get('error', '未知错误')
+                }), 500
+
+        except Exception as e:
+            logger.error(f"重新加载用户缓存失败: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route('/user-cache/search', methods=['GET'])
+    def search_users():
+        """搜索用户"""
+        try:
+            query = request.args.get('q', '').strip()
+            limit = int(request.args.get('limit', 10))
+
+            if not query:
+                return jsonify({"error": "缺少搜索关键词"}), 400
+
+            if limit > 50:
+                limit = 50
+            if limit < 1:
+                limit = 1
+
+            # 获取用户缓存
+            from core.user_cache import get_user_cache
+            user_cache = get_user_cache()
+
+            if not user_cache.is_loaded:
+                return jsonify({
+                    "error": "用户缓存未加载",
+                    "message": "请先加载用户缓存"
+                }), 503
+
+            results = user_cache.search_users(query, limit)
+
+            return jsonify({
+                "query": query,
+                "results": results,
+                "total": len(results),
+                "limit": limit,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        except ValueError as e:
+            return jsonify({"error": f"参数错误: {str(e)}"}), 400
+        except Exception as e:
+            logger.error(f"搜索用户失败: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route('/user-cache/validate-mention', methods=['POST'])
+    def validate_mention():
+        """验证@艾特是否有效"""
+        try:
+            data = request.get_json()
+
+            if not data:
+                return jsonify({"error": "请求数据为空"}), 400
+
+            mention_name = data.get('mention_name', '').strip()
+            chatroom_id = data.get('chatroom_id')
+
+            if not mention_name:
+                return jsonify({"error": "缺少mention_name参数"}), 400
+
+            # 获取用户缓存
+            from core.user_cache import get_user_cache
+            user_cache = get_user_cache()
+
+            if not user_cache.is_loaded:
+                return jsonify({
+                    "error": "用户缓存未加载",
+                    "message": "请先加载用户缓存"
+                }), 503
+
+            is_valid = user_cache.is_valid_mention(mention_name, chatroom_id)
+
+            return jsonify({
+                "mention_name": mention_name,
+                "chatroom_id": chatroom_id,
+                "is_valid": is_valid,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"验证@艾特失败: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route('/preload/status', methods=['GET'])
+    def get_preload_status_all():
+        """获取所有预加载状态"""
+        try:
+            status = preload_manager.get_preload_status()
+
+            return jsonify({
+                "preload_status": status,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"获取预加载状态失败: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route('/preload/reload-all', methods=['POST'])
+    def reload_all_preload():
+        """重新加载所有预加载资源"""
+        try:
+            result = preload_manager.preload_all()
+
+            return jsonify({
+                "message": "重新加载所有预加载资源",
+                "result": result,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"重新加载预加载资源失败: {e}")
+            return jsonify({"error": str(e)}), 500
+
     # 错误处理
     @api.errorhandler(404)
     def not_found(error):

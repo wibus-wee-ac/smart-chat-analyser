@@ -35,6 +35,10 @@ class Config:
     MODEL_CACHE_DIR: str = os.getenv('MODEL_CACHE_DIR', './models')
     SENTIMENT_MODEL: str = os.getenv('SENTIMENT_MODEL', 'uer/roberta-base-finetuned-chinanews-chinese')
     AUTO_PRELOAD_MODELS: bool = os.getenv('AUTO_PRELOAD_MODELS', 'False').lower() == 'true'
+
+    # 用户缓存配置
+    AUTO_PRELOAD_USER_CACHE: bool = os.getenv('AUTO_PRELOAD_USER_CACHE', 'True').lower() == 'true'
+    USER_CACHE_REFRESH_INTERVAL: int = int(os.getenv('USER_CACHE_REFRESH_INTERVAL', '3600'))  # 1小时
     
     # 文件存储配置
     CHARTS_OUTPUT_DIR: str = os.getenv('CHARTS_OUTPUT_DIR', './charts')
