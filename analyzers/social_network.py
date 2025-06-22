@@ -59,8 +59,15 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
 
             # 处理自己发送的消息
             if is_self:
-                if sender == '__SELF__' or not sender:
-                    self.name_cache['__SELF__'] = '我'
+                # 当 isSelf=True 时，sender 和 senderName 通常为空，需要补全
+                if not sender:
+                    sender = '__SELF__'
+                if not sender_name:
+                    sender_name = '我'
+                self.name_cache['__SELF__'] = '我'
+                # 也缓存实际的 sender（如果有的话）
+                if sender and sender != '__SELF__':
+                    self.name_cache[sender] = '我'
             elif sender and sender_name:
                 self.name_cache[sender] = sender_name
 
@@ -192,14 +199,18 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
         
         for item in sorted_data:
             sender = item.get('sender', '')
+            sender_name = item.get('senderName', '')
             content = item.get('content', '')
             time_str = item.get('time', '')
             msg_type = item.get('type', 0)
             is_self = item.get('isSelf', False)
 
             # 处理自己发送的消息
-            if is_self and not sender:
-                sender = '__SELF__'
+            if is_self:
+                if not sender:
+                    sender = '__SELF__'
+                if not sender_name:
+                    sender_name = '我'
 
             if sender and content:
                 user_messages[sender].append({
@@ -370,7 +381,11 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
 
         for node in self.graph.nodes():
             node_data = self.graph.nodes[node]
-            user_stats[node] = {
+            # 使用用户显示名称而不是内部标识符
+            display_name = self._get_user_name(node)
+            user_stats[display_name] = {
+                'user_id': node,  # 保留内部标识符用于引用
+                'display_name': display_name,
                 'message_count': node_data.get('message_count', 0),
                 'avg_message_length': node_data.get('avg_message_length', 0),
                 'in_degree': self.graph.in_degree(node),

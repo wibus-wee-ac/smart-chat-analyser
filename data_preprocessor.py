@@ -256,10 +256,9 @@ class DataPreprocessor:
         is_self = item.get('isSelf', False)
         if is_self:
             # 为自己发送的消息添加标识
-            if not cleaned_item.get('sender'):
-                cleaned_item['sender'] = '__SELF__'  # 特殊标识符表示自己
-            if not cleaned_item.get('senderName'):
-                cleaned_item['senderName'] = '我'  # 显示名称
+            cleaned_item['sender'] = '__SELF__'  # 特殊标识符表示自己
+            cleaned_item['senderName'] = '我'  # 显示名称
+                
 
         # 移除多余的空白字符
         content = re.sub(r'\s+', ' ', content).strip()
