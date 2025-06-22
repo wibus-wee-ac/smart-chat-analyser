@@ -131,8 +131,17 @@ class SocialNetworkAnalyzer(BaseAnalyzer):
         mentioned_users = []
 
         # 使用消息解析器提取@艾特信息
-        parsed1 = self.content_parser.parse_message(content1)
-        parsed2 = self.content_parser.parse_message(content2)
+        # 检查是否为群聊消息，获取群聊ID
+        chatroom_id = None
+        if '@chatroom' in sender1 or '@chatroom' in sender2:
+            # 从发送者中提取群聊ID
+            for sender in [sender1, sender2]:
+                if '@chatroom' in sender:
+                    chatroom_id = sender
+                    break
+
+        parsed1 = self.content_parser.parse_message(content1, chatroom_id)
+        parsed2 = self.content_parser.parse_message(content2, chatroom_id)
 
         # 收集所有被@的用户
         all_mentions = parsed1['mentions'] + parsed2['mentions']
