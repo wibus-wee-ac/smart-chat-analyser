@@ -76,10 +76,15 @@ def initialize_services():
         task_queue.start_worker()
         logger.info("任务队列工作线程已启动")
 
-        # 启动模型预加载（异步，不阻塞启动）
+        # 初始化预加载管理器
+        from core.preloader import get_preload_manager
+        preload_manager = get_preload_manager()
+        logger.info("预加载管理器初始化完成")
+
+        # 启动预加载（异步，不阻塞启动）
         from config import config
-        if config.AUTO_PRELOAD_MODELS:
-            start_model_preloading(model_manager)
+        if config.AUTO_PRELOAD_MODELS or config.AUTO_PRELOAD_USER_CACHE:
+            start_preloading(preload_manager)
         else:
             logger.info("自动预加载已禁用")
 
@@ -89,37 +94,33 @@ def initialize_services():
             'preprocessing_service': preprocessing_service,
             'analysis_service': analysis_service,
             'visualization_service': visualization_service,
-            'task_handler': task_handler
+            'task_handler': task_handler,
+            'preload_manager': preload_manager
         }
 
     except Exception as e:
         logger.error(f"服务初始化失败: {e}")
         raise
 
-def start_model_preloading(model_manager):
-    """启动模型预加载"""
+def start_preloading(preload_manager):
+    """启动预加载"""
     import threading
 
     def preload_worker():
         try:
-            logger.info("开始自动预加载常用模型...")
-            # 预加载情感分析模型（优先级最高）
-            model_manager.preload_model("sentiment_model")
-
-            # 延迟一段时间后预加载其他模型，避免启动时资源竞争
-            import time
-            time.sleep(5)
-
-            # 预加载BERTopic模型
-            model_manager.preload_model("bertopic_model")
-
-            logger.info("自动预加载任务已启动")
+            logger.info("开始自动预加载...")
+            # 使用预加载管理器统一管理预加载
+            result = preload_manager.preload_all()
+            if result['success']:
+                logger.info("自动预加载完成")
+            else:
+                logger.error(f"自动预加载失败: {result}")
 
         except Exception as e:
-            logger.error(f"自动预加载失败: {e}")
+            logger.error(f"自动预加载异常: {e}")
 
     # 在后台线程中执行预加载
-    preload_thread = threading.Thread(target=preload_worker, daemon=True, name="ModelPreloader")
+    preload_thread = threading.Thread(target=preload_worker, daemon=True, name="Preloader")
     preload_thread.start()
 
 def register_routes(app, socketio, services):
