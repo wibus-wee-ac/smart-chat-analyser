@@ -113,17 +113,17 @@ class ModelManager:
         """加载情感分析模型"""
         try:
             from transformers import pipeline
-            
-            # 优化配置
-            model_name = "uer/roberta-base-finetuned-chinanews-chinese"
-            
+
+            # 使用正确的中文情感分析模型
+            model_name = "IDEA-CCNL/Erlangshen-Roberta-110M-Sentiment"
+
             # 检查设备
             device = -1  # CPU
             if torch.cuda.is_available():
                 device = 0
             elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                 device = 0  # MPS for Apple Silicon
-            
+
             pipeline_model = pipeline(
                 "sentiment-analysis",
                 model=model_name,
@@ -131,9 +131,9 @@ class ModelManager:
                 torch_dtype=torch.float16 if device >= 0 else torch.float32,
                 model_kwargs={"low_cpu_mem_usage": True}
             )
-            
+
             return pipeline_model
-            
+
         except Exception as e:
             logger.error(f"加载情感分析模型失败: {e}")
             return None

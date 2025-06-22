@@ -44,10 +44,11 @@ class SentimentAnalyzer(BaseAnalyzer):
 
 
 
-        # 情感标签映射
+        # 情感标签映射 - 支持IDEA-CCNL/Erlangshen-Roberta-110M-Sentiment模型
         self.emotion_labels = {
-            'POSITIVE': '积极', 'NEGATIVE': '消极', 'NEUTRAL': '中性',
-            'LABEL_0': '消极', 'LABEL_1': '积极', 'LABEL_2': '中性'
+            'POSITIVE': 'positive', 'NEGATIVE': 'negative', 'NEUTRAL': 'neutral',
+            'Positive': 'positive', 'Negative': 'negative', 'Neutral': 'neutral',
+            'LABEL_0': 'negative', 'LABEL_1': 'positive', 'LABEL_2': 'neutral'
         }
 
         # 初始化模型
@@ -109,9 +110,18 @@ class SentimentAnalyzer(BaseAnalyzer):
 
                 sentiment = self.emotion_labels.get(best_label, best_label).lower()
 
+                # 计算分数（保持向后兼容）
+                if sentiment == 'positive':
+                    score = best_score
+                elif sentiment == 'negative':
+                    score = -best_score
+                else:
+                    score = 0.0
+
                 return {
                     'sentiment': sentiment,
                     'confidence': best_score,
+                    'score': score,
                     'scores': scores,
                     'method': 'transformers'
                 }
