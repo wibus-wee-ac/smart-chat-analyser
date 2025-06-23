@@ -191,7 +191,7 @@ class DataPreprocessor:
             return False
         
         # 检查是否为纯数字（超过10位）
-        if content.isdigit() and len(content) > 10:
+        if content.isdigit() and len(content) > 4:
             return False
         
         # # 检查是否为纯符号
@@ -256,7 +256,7 @@ class DataPreprocessor:
         is_self = item.get('isSelf', False)
         if is_self:
             # 为自己发送的消息添加标识
-            cleaned_item['sender'] = '__SELF__'  # 特殊标识符表示自己
+            cleaned_item['sender'] = 'Me'  # 特殊标识符表示自己
             cleaned_item['senderName'] = '我'  # 显示名称
                 
 
