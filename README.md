@@ -342,6 +342,8 @@ curl -X POST http://localhost:6142/api/v1/models/preload/cancel \
 
 欢迎提交Issue和Pull Request！
 
-## 许可证
+## Author
 
-MIT License 
+Smart Chat Analyser © Wibus, Released under AGPLv3. Created on Jun 21, 2025
+
+> [Personal Website](http://wibus.ren/) · [Blog](https://blog.wibus.ren/) · GitHub [@wibus-wee](https://github.com/wibus-wee/) · Telegram [@wibus✪](https://t.me/wibus_wee)
