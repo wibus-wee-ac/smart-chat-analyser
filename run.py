@@ -103,10 +103,8 @@ def print_startup_info():
     print(f"📝 日志目录: {config.LOGS_DIR}")
     print("=" * 60)
     print("🔗 API文档:")
-    print(f"  健康检查: http://{config.HOST}:{config.PORT}/api/v1/health")
-    print(f"  提交任务: POST http://{config.HOST}:{config.PORT}/api/v1/tasks")
-    print(f"  查询任务: GET http://{config.HOST}:{config.PORT}/api/v1/tasks/<task_id>")
-    print(f"  系统状态: http://{config.HOST}:{config.PORT}/api/v1/system/stats")
+    print(f"  Swagger UI: http://{config.HOST}:{config.PORT}/docs")
+    print(f"  OpenAPI JSON: POST http://{config.HOST}:{config.PORT}/api/v1/swagger.json")
     print("=" * 60)
 
 if __name__ == '__main__':
