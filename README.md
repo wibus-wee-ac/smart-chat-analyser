@@ -8,12 +8,15 @@
     <br />
     <br />
     <b>Download for </b>
-    <a href="">Source Code</a>
+    <a href="https://github.com/wibus-wee/smart-chat-analyser/archive/refs/heads/main.zip">Source Code</a>
+    ·
+    <b>Related Projects: </b>
+    <a href="https://github.com/wibus-wee/smart-chat-analyser-frontend">Backend Repo</a>
     <br />
   </p>
 </p>
 
-> [!TIPS]
+> [!NOTE]
 >
 > 项目使用了 Augment Code 作为一路 Vibe Coding 的插件，但是我暂时还没找到能导出该项目聊天记录的插件。因此目前先将此项目的 Augment Memories 公布出来
 >
