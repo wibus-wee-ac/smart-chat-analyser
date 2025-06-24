@@ -11,7 +11,7 @@
     <a href="https://github.com/wibus-wee/smart-chat-analyser/archive/refs/heads/main.zip">Source Code</a>
     ·
     <b>Related Projects: </b>
-    <a href="https://github.com/wibus-wee/smart-chat-analyser-frontend">Backend Repo</a>
+    <a href="https://github.com/wibus-wee/smart-chat-analyser-frontend">Frontend Repo</a>
     <br />
   </p>
 </p>
