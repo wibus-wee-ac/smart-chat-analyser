@@ -159,13 +159,17 @@ def create_api_routes(services):
                 
                 # 提交任务
                 task_id = task_queue.submit_task(task_type, task_data)
-                
+
+                # 获取任务信息以获得群聊名称
+                task_info = task_queue.get_task_status(task_id)
+
                 return {
                     "task_id": task_id,
                     "status": "submitted",
                     "message": "任务已提交",
                     "task_type": task_type,
-                    "submitted_at": datetime.now().isoformat()
+                    "submitted_at": datetime.now().isoformat(),
+                    "chat_name": task_info.chat_name if task_info else None
                 }
                 
             except Exception as e:
@@ -215,7 +219,8 @@ def create_api_routes(services):
                     "task_id": task_id,
                     "status": task_info.status.value,
                     "result": task_info.result,
-                    "completed_at": task_info.completed_at.isoformat() if task_info.completed_at else None
+                    "completed_at": task_info.completed_at.isoformat() if task_info.completed_at else None,
+                    "chat_name": task_info.chat_name
                 }
                 
             except Exception as e:

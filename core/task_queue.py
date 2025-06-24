@@ -57,6 +57,7 @@ class TaskInfo:
     message: str = ""
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    chat_name: Optional[str] = None  # 群聊名称
     
     def to_dict(self, include_result: bool = True) -> Dict[str, Any]:
         """
@@ -110,39 +111,89 @@ class TaskQueue:
     def submit_task(self, task_type: str, task_data: Dict[str, Any]) -> str:
         """
         提交任务
-        
+
         Args:
             task_type: 任务类型
             task_data: 任务数据
-            
+
         Returns:
             任务ID
         """
         task_id = str(uuid.uuid4())
-        
+
+        # 获取群聊名称
+        chat_name = self._get_chat_name(task_data)
+
         # 创建任务信息
         task_info = TaskInfo(
             task_id=task_id,
             task_type=task_type,
             status=TaskStatus.PENDING,
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            chat_name=chat_name
         )
-        
+
         # 保存任务信息
         self._save_task_info(task_info)
-        
+
         # 将任务加入队列
         task_payload = {
             "task_id": task_id,
             "task_type": task_type,
             "task_data": task_data
         }
-        
+
         self.redis_client.lpush(self.queue_name, json.dumps(task_payload, cls=TaskJSONEncoder, ensure_ascii=False))
-        
+
         logger.info(f"任务已提交: {task_id} ({task_type})")
         return task_id
-    
+
+    def _get_chat_name(self, task_data: Dict[str, Any]) -> Optional[str]:
+        """
+        根据任务数据获取群聊名称
+
+        Args:
+            task_data: 任务数据
+
+        Returns:
+            群聊名称，如果无法获取则返回None
+        """
+        try:
+            # 导入ChatlogClient
+            from chatlog_client import ChatlogClient
+
+            chatroom_id = task_data.get('chatroom_id')
+            talker = task_data.get('talker')
+
+            if not chatroom_id and not talker:
+                return None
+
+            # 创建客户端获取群聊列表
+            client = ChatlogClient()
+            chatrooms = client.get_chatrooms()
+
+            if talker:
+                # 通过talker匹配群聊名称
+                for chatroom in chatrooms:
+                    if chatroom.get('userName') == talker or chatroom.get('nickName') == talker:
+                        return chatroom.get('nickName') or chatroom.get('name', talker)
+                    
+            if chatroom_id:
+                # 通过chatroom_id匹配群聊名称
+                for chatroom in chatrooms:
+                    # 假设chatroom结构包含id字段，如果不是需要调整匹配逻辑
+                    if chatroom.get('userName') == chatroom_id or chatroom.get('nickName') == chatroom_id:
+                        return chatroom.get('nickName') or chatroom.get('name', chatroom_id)
+
+
+            # 如果没有匹配到，返回原始标识符
+            return talker or chatroom_id
+
+        except Exception as e:
+            logger.warning(f"获取群聊名称失败: {e}")
+            # 如果获取失败，返回原始标识符
+            return task_data.get('chatroom_id') or task_data.get('talker')
+
     def get_task_status(self, task_id: str) -> Optional[TaskInfo]:
         """获取任务状态"""
         task_key = f"{self.task_prefix}{task_id}"
@@ -164,7 +215,8 @@ class TaskQueue:
             progress=data['progress'],
             message=data['message'],
             result=data['result'],
-            error=data['error']
+            error=data['error'],
+            chat_name=data.get('chat_name')  # 兼容旧数据，如果没有chat_name字段则为None
         )
         
         return task_info
@@ -347,7 +399,8 @@ class TaskQueue:
                             progress=data['progress'],
                             message=data['message'],
                             result=data['result'],
-                            error=data['error']
+                            error=data['error'],
+                            chat_name=data.get('chat_name')  # 兼容旧数据，如果没有chat_name字段则为None
                         )
 
                         tasks.append(task_info)

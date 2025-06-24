@@ -52,6 +52,7 @@ def create_api_models(api):
         'message': fields.String(required=True, description='提交消息'),
         'task_type': fields.String(required=True, description='任务类型'),
         'submitted_at': fields.String(required=True, description='提交时间'),
+        'chat_name': fields.String(description='群聊名称'),
     })
     
     pagination_info = api.model('PaginationInfo', {
@@ -74,6 +75,7 @@ def create_api_models(api):
         'created_at': fields.String(description='创建时间'),
         'started_at': fields.String(description='开始时间'),
         'completed_at': fields.String(description='完成时间'),
+        'chat_name': fields.String(description='群聊名称'),
     })
     
     tasks_list_response = api.model('TasksListResponse', {
@@ -88,6 +90,7 @@ def create_api_models(api):
         'status': fields.String(required=True, description='任务状态'),
         'result': fields.Raw(description='任务结果数据'),
         'completed_at': fields.String(description='完成时间'),
+        'chat_name': fields.String(description='群聊名称'),
     })
     
     task_cancel_response = api.model('TaskCancelResponse', {
